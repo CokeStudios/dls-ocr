@@ -12,7 +12,7 @@ import numpy
 
 READER = easyocr.Reader(['en', 'ch_sim'])
 DEVICE = {
-    '2048x1536': {
+    '1536x2048': {
         'device': ('IPAD'),
         'cards_count': (3, 3),
         'topleft_coords': (77, 284),
@@ -21,7 +21,7 @@ DEVICE = {
         'card_height': 260,
         'height_space': 43,
         'name': (0, 0, 423, 41),
-        'stats': (80, 16),
+        # 'stats': (80, 16),
         'stats_topleft_coords': (8, 71),
         'stats_size': 53,
         'stats_width_space': 6,
@@ -31,6 +31,25 @@ DEVICE = {
         'leg': (83, 234, 105, 256),
         'price': (300, 222, 420, 260),
         'position': (330, 172, 352, 190)
+    },
+    '828x1792': {
+        'device': ('iPhone XR'),
+        'cards_count': (3, 3),
+        'topleft_coords': (186, 172),
+        'card_width': 257,
+        'width_space': 102,
+        'card_height': 159,
+        'height_space': 25,
+        'name': (0, 0, 257, 26),
+        'stats_topleft_coords': (6, 43),
+        'stats_size': 33,
+        'stats_width_space': 2,
+        'stats_height_space': 19,
+        'overall': (163, 33, 189, 59),
+        'height': (8, 143, 26, 155),
+        'leg': (52, 143, 86, 157),
+        'price': (159, 134, 229, 158),
+        'position': (200, 106, 215, 115)
     }
 }
 
@@ -107,7 +126,7 @@ def parse_image(image_dir: str, device: str,
         player_name: list[str] = READER.readtext(numpy.asarray(name_image),
                                                  detail=False)
         if player_name == [] or not bool(player_name[0].strip()) or \
-                player_name[0].strip() in ['神秘球员']:
+                player_name[0].strip().lower() in ['神秘球员', 'secret player']:
             continue
 
         player_name = player_name[0].title().strip('_')
@@ -213,12 +232,12 @@ def parse_image(image_dir: str, device: str,
                                      detail=False)[0].strip()
             leg_image = card.crop(device_dict['leg'])
             leg = READER.readtext(numpy.asarray(leg_image),
-                                  detail=False)[0].strip()
-            if leg == '左':
+                                  detail=False)[0].strip().lower()
+            if leg in ['left', '左']:
                 leg = 'L'
-            elif leg == '右':
+            elif leg in ['right', '右']:
                 leg = 'R'
-            elif leg == '双':
+            elif leg in ['both', '双']:
                 leg = 'B'
             price_image = card.crop(device_dict['price'])
             price: str = READER.readtext(numpy.asarray(price_image),
@@ -534,7 +553,7 @@ if __name__ == '__main__':
     # param "restore=True" will reset images' filenames
     empty_database = 'DLS 25 test database.xlsx'
     image_dir = 'dls25/0109'
-    device_size = '2048x1536'
+    device_size = '1536x2048'
 
     wb = load_workbook(empty_database)
     result = parse_image('dls25/0109',
