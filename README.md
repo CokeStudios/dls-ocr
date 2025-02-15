@@ -1,6 +1,8 @@
 # DLS-ocr
 Collect DLS25 player data from transfer market screenshots.
 
+Only support 1536x2048 and 828x1792 devices!
+
 ## Usage
 Install requirements
 
