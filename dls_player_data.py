@@ -1,4 +1,4 @@
-from string import ascii_uppercase
+from string import ascii_uppercase, ascii_letters
 from time import perf_counter
 from tkinter import Tk, StringVar, Label, Entry, Button
 import os
@@ -54,7 +54,209 @@ DEVICE = {
 }
 
 
-def parse_image(image_dir: str, device: str,
+def check_overall(pixel: tuple[int]):
+    check1 = 38 <= pixel[0] <= 41 and 220 <= pixel[1] <= 222 and \
+        20 <= pixel[2] <= 30
+    check2 = 240 <= pixel[0] <= 243 and 197 <= pixel[1] <= 200 and \
+        76 <= pixel[2] <= 78
+    check3 = 240 <= pixel[0] <= 255 and 135 <= pixel[1] <= 140 and \
+        20 <= pixel[2] <= 26
+    return check1 or check2 or check3
+
+
+def check_position(pixel: tuple[int]):
+    check1 = pixel[0] == 255 and 85 <= pixel[1] <= 90 and \
+        115 <= pixel[2] <= 125
+    check2 = 45 <= pixel[0] <= 55 and 165 <= pixel[1] <= 175 and \
+        250 <= pixel[2] <= 255
+    check3 = 250 <= pixel[0] <= 255 and 250 <= pixel[1] <= 255 and \
+        85 <= pixel[2] <= 95
+    check4 = 65 <= pixel[0] <= 75 and 245 <= pixel[1] <= 255 and \
+        90 <= pixel[2] <= 100
+    return check1 or check2 or check3 or check4
+
+
+def scan_coords(image: Image.Image) -> dict:
+    device_dict = {'cards_count': (3, 3)}
+    width, height = image.size
+    for x in range(width):
+        pixels = []
+        have = False
+        have2 = False
+        for y in range(height):
+            pixel = image.getpixel((x, y))[0:3]
+            if pixel == (133, 133, 133):
+                have = True
+                pixels.append(pixel)
+                if len(pixels) >= 20:
+                    have2 = True
+            elif len(pixels) >= 3 and pixel == (98, 98, 98) and \
+                    'topleft_coords' not in device_dict:
+                device_dict['topleft_coords'] = [x]
+            else:
+                pixels = []
+
+        if have is False and 'topleft_coords' in device_dict and \
+                'card_width' not in device_dict:
+            device_dict['card_width'] = x - 1 - \
+                device_dict['topleft_coords'][0]
+
+        if have2 is True and 'card_width' in device_dict:
+            device_dict['width_space'] = x - 1 - \
+                device_dict['topleft_coords'][0] - device_dict['card_width']
+            break
+
+    else:
+        return {}
+
+    for y in range(height):
+        pixels = []
+        pixels2 = []
+        for x in range(width):
+            pixel = image.getpixel((x, y))[0:3]
+            if all(132 <= x <= 134 for x in pixel):
+                pixels.append(pixel)
+            else:
+                pixels = []
+
+            if len(pixels) == 200 and len(device_dict['topleft_coords']) == 1:
+                device_dict['topleft_coords'].append(y)
+                for y1 in range(y + 1, y + 101):
+                    pixel1 = image.getpixel((x, y1))[0:3]
+                    if all(72 <= x <= 98 for x in pixel1):
+                        device_dict['name'] = \
+                            (0, 0, device_dict['card_width'],
+                                y1 - device_dict['topleft_coords'][1])
+                        break
+                break
+
+            if all(53 <= x <= 57 for x in pixel):
+                pixels2.append(pixel)
+            else:
+                pixels2 = []
+
+            if len(pixels2) == 100 and 'height_space' not in device_dict:
+                for y2 in range(y + 11, y + 81):
+                    pixel3 = image.getpixel((x, y2))[0:3]
+                    if 'panel' not in device_dict and \
+                            all(53 <= x <= 57 for x in pixel3):
+                        device_dict['panel'] = y2 - 1 - \
+                            device_dict['topleft_coords'][1]
+
+                    if all(18 <= x <= 30 for x in pixel3) and \
+                            'card_height' not in device_dict and \
+                            len(device_dict['topleft_coords']) == 2:
+                        device_dict['card_height'] = \
+                            y2 - device_dict['topleft_coords'][1]
+                        break
+
+                for y3 in range(y2 + 21, y2 + 200):
+                    pixel4 = image.getpixel((x, y3))[0:3]
+                    if all(123 <= x <= 135 for x in pixel4) and \
+                            'card_height' in device_dict:
+                        device_dict['height_space'] = y3 - y2
+                        break
+
+    x0 = device_dict['topleft_coords'][0]
+    y0 = device_dict['topleft_coords'][1]
+    y0 += device_dict['card_height'] + device_dict['height_space']
+    x1 = x0 + device_dict['card_width']
+    y1 = y0 + device_dict['card_height']
+    image = image.crop((x0, y0, x1, y1))
+    width, height = image.size
+    sv = 0
+    for x in range(2, width - 2):
+        have = False
+        for y in range(4, height - 4):
+            pixel = image.getpixel((x, y))[0:3]
+            if pixel == (0, 0, 0):
+                have = True
+                break
+
+        if have is True and \
+                'stats_topleft_coords' not in device_dict:
+            device_dict['stats_topleft_coords'] = [x]
+
+        if have is False and 'stats_topleft_coords' in device_dict and \
+                'stats_size' not in device_dict:
+            sv = x
+            device_dict['stats_size'] = x - 1 - \
+                device_dict['stats_topleft_coords'][0]
+
+        if have is True and 'stats_size' in device_dict:
+            device_dict['stats_width_space'] = x - sv
+            break
+
+    sv2 = 0
+    for y in range(4, height - 4):
+        have = False
+        for x in range(2, width - 2):
+            pixel = image.getpixel((x, y))[0:3]
+            if pixel == (0, 0, 0):
+                have = True
+                break
+
+        if have is True and \
+                len(device_dict['stats_topleft_coords']) == 1:
+            device_dict['stats_topleft_coords'].append(y)
+
+        if have is False and len(device_dict['stats_topleft_coords']) == 2 \
+                and sv2 == 0:
+            sv2 = y
+
+        if have is True and len(device_dict['stats_topleft_coords']) == 2 \
+                and sv2 != 0:
+            device_dict['stats_height_space'] = y - sv2
+            break
+
+    last = (0, 0, 0)
+    for y in range(height):
+        if 'overall' in device_dict and 'position' in device_dict:
+            break
+
+        for x in range(width):
+            pixel = image.getpixel((x, y))[0:3]
+            if check_overall(pixel) and 'overall' not in device_dict:
+                device_dict['overall'] = [
+                    0, y, 0, int(y + device_dict['stats_size'] * 0.7) + 1]
+                break
+
+            if check_position(pixel) and 'position' not in device_dict:
+                device_dict['position'] = [x, y, 0, 0]
+
+            if check_position(last) and (not check_position(pixel)) and \
+                    device_dict['position'][2] == 0:
+                device_dict['position'][2] = x
+                break
+
+            last = pixel[::]
+
+    last = (0, 0, 0)
+    for x in range(width):
+        if device_dict['overall'][0] != 0 and device_dict['position'][3] != 0:
+            break
+
+        for y in range(height):
+            pixel = image.getpixel((x, y))[0:3]
+            if check_overall(pixel) and device_dict['overall'][0] == 0:
+                device_dict['overall'][0] = x
+                device_dict['overall'][2] = x + \
+                    int(device_dict['stats_size'] * .7) + 1
+                break
+
+            if check_position(last) and (not check_position(pixel)) and \
+                    device_dict['position'][3] == 0:
+                device_dict['position'][3] = y
+                break
+
+            last = pixel[::]
+
+    device_dict['panel'] = (0, device_dict['panel'],
+                            image.width, image.height)
+    return device_dict
+
+
+def parse_image(image_dir: str,
                 max_file: int = -1, max_cards: int = -1,
                 output: bool = False, rename: bool = True,
                 restore: bool = False):
@@ -68,7 +270,6 @@ def parse_image(image_dir: str, device: str,
             fn2 = filename.replace('_OLD', '')
             os.rename(filename, fn2)
 
-    device_dict = DEVICE[device.lower()]
     cards: list[Image.Image] = []
     i = 0
     for image_file in os.listdir(image_dir):
@@ -92,6 +293,7 @@ def parse_image(image_dir: str, device: str,
         except Exception:
             continue
 
+        device_dict = scan_coords(image)
         x0 = device_dict['topleft_coords'][0]
         count_x = 0
         while count_x < device_dict['cards_count'][0]:
@@ -210,6 +412,9 @@ def parse_image(image_dir: str, device: str,
         club, nationality = '', ''
         overall_image = card.crop(device_dict['overall'])
         overall_ori = overall_image.copy()
+        overall_image = overall_image.resize(
+            (overall_image.size[0] * 6, overall_image.size[1] * 6),
+            resample=Image.NEAREST)
         overall = READER.readtext(numpy.asarray(overall_image),
                                   detail=False)
         if overall in [[], ['']]:
@@ -227,22 +432,29 @@ def parse_image(image_dir: str, device: str,
 
         overall = overall[0].strip()
         try:
-            height_image = card.crop(device_dict['height'])
-            height = READER.readtext(numpy.asarray(height_image),
-                                     detail=False)[0].strip()
-            leg_image = card.crop(device_dict['leg'])
-            leg = READER.readtext(numpy.asarray(leg_image),
-                                  detail=False)[0].strip().lower()
+            panel_image = card.crop(device_dict['panel'])
+            txt = READER.readtext(numpy.asarray(panel_image),
+                                  detail=False)
+            height = txt[0].strip().strip(ascii_letters)
+            leg = txt[1].strip().lower()
+            price = txt[2].strip()
+            # height_image = card.crop(device_dict['height'])
+            # height = READER.readtext(numpy.asarray(height_image),
+            #                          detail=False)[0].strip()
+            # leg_image = card.crop(device_dict['leg'])
+            # leg = READER.readtext(numpy.asarray(leg_image),
+            #                       detail=False)[0].strip().lower()
+            # price_image = card.crop(device_dict['price'])
+            # price: str = READER.readtext(numpy.asarray(price_image),
+            #                              detail=False)[0].strip()
+            price = price.replace(',', '').replace('，', '').replace(' ', '')
             if leg in ['left', '左']:
                 leg = 'L'
             elif leg in ['right', '右']:
                 leg = 'R'
-            elif leg in ['both', '双']:
+            elif leg in ['both', '双', '双脚']:
                 leg = 'B'
-            price_image = card.crop(device_dict['price'])
-            price: str = READER.readtext(numpy.asarray(price_image),
-                                         detail=False)[0].strip()
-            price = price.replace(',', '').replace('，', '').replace(' ', '')
+
             position_image = card.crop(device_dict['position'])
             pos_image2 = position_image.resize(
                 (position_image.size[0] * 4, position_image.size[1] * 4),
@@ -261,9 +473,14 @@ def parse_image(image_dir: str, device: str,
             position = position.translate(pos_table)
 
             t2 = perf_counter()
+            panel_image_1 = panel_image.crop(
+                (0, 0, panel_image.width // 2, panel_image.height))
+            panel_image_2 = panel_image.crop(
+                (panel_image.width // 2, 0,
+                 panel_image.width, panel_image.height))
             player_tuple = ((card, name_image_ori, overall_ori,
-                             position_image, stats_images, height_image,
-                             leg_image, price_image),
+                             position_image, stats_images,
+                             panel_image_1, panel_image_1, panel_image_2),
                             (club, nationality), ' '.join(player_name),
                             int(overall), position, stats,
                             int(height), leg, int(price),
@@ -531,8 +748,10 @@ def check_gui(data: list[list[list[Image.Image]]]):
             panel.image = image
             panel.grid(row=row, column=i - column_minus, sticky='w')
 
-            if i in [0, 2]:
+            if i in [0, 1, 2, 11]:
                 text = Entry(root, textvariable=var[i], bg='orange')
+            elif new_stats_list[i] in [0, '0', '']:
+                text = Entry(root, textvariable=var[i], bg='red')
             else:
                 text = Entry(root, textvariable=var[i])
 
@@ -540,9 +759,11 @@ def check_gui(data: list[list[list[Image.Image]]]):
             text.grid(row=row + 1, column=i - column_minus, sticky='w')
             rows += 1
 
-        button = Button(root, text='Submit',   # default='active',
+        button = Button(root, text='Submit', default='active',
                         command=callback)
         button.grid(row=row + 2, column=0, sticky='w')
+        button2 = Button(root, text='Skip', command=root.destroy)
+        button2.grid(row=row + 2, column=1, sticky='w')
         root.mainloop()
 
     write_player_data(all_data)
@@ -552,11 +773,9 @@ if __name__ == '__main__':
     # Will rename all the image files (so that it won't be parsed next time)
     # param "restore=True" will reset images' filenames
     empty_database = 'DLS 25 test database.xlsx'
-    image_dir = 'dls25/0109'
-    device_size = '1536x2048'
+    image_dir = 'dls25/winter'
 
     wb = load_workbook(empty_database)
-    result = parse_image('dls25/0109',
-                         '2048x1536',
+    result = parse_image(image_dir, rename=False,
                          output=True)
     check_gui(result)
