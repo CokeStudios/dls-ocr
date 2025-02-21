@@ -583,9 +583,11 @@ def write_player_data(data):
             index, ws1 = k[0]
             player_id = ws1[f'W{index}'].value
             old_rating = int(ws1[f'I{index}'].value)
+            old_nat = ws1[f'E{index}'].value
+            old_club = ws1[f'F{index}'].value
             ws1.delete_rows(index)
         else:
-            player_id = ''
+            player_id = old_nat = old_club = ''
             old_rating = 0
 
         ws = wb['Legendary Players']
@@ -625,7 +627,8 @@ def write_player_data(data):
 
         row = ws.max_row + 1
         input_data = ['', *player_name, data_list[-3],
-                      data_list[-2], data_list[-1], data_list[2],
+                    #   data_list[-2], data_list[-1], data_list[2],
+                      old_nat, old_club, data_list[2],
                       data_list[-4], rating, data_list[-5], *stats,
                       rating_change,  # total_stats,
                       '', player_id]
