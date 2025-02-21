@@ -779,6 +779,6 @@ if __name__ == '__main__':
     image_dir = 'dls25/winter'
 
     wb = load_workbook(empty_database)
-    result = parse_image(image_dir, rename=False,
+    result = parse_image(image_dir,
                          output=True)
     check_gui(result)
